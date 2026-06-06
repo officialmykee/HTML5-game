@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Loader</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  /* Full screen background image */
+  #bg {
+    position: fixed;
+    inset: 0;
+    background-image: url('https://i.ibb.co/wh4h5Fth/image.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    z-index: 0;
+  }
+
+  /* Dark vignette at bottom for bar readability */
+  #bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent 50%,
+      rgba(0,0,0,0.55) 78%,
+      rgba(0,0,0,0.82) 100%
+    );
+  }
+
+  /* Rotate prompt */
+  #rotatePrompt {
+    position: fixed;
+    inset: 0;
+    background: #07080f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    z-index: 20;
+    transition: opacity 0.5s ease;
+  }
+  #rotatePrompt.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .phone-wrap {
+    animation: tiltPhone 2s ease-in-out infinite;
+  }
+  .phone-svg { width: 56px; height: auto; }
+
+  @keyframes tiltPhone {
+    0%   { transform: rotate(0deg); }
+    40%  { transform: rotate(90deg); }
+    65%  { transform: rotate(90deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  #rotatePrompt p {
+    color: rgba(180,240,255,0.75);
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  /* Loader bar area — sits at bottom of screen */
+  #loaderWrap {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0 5% 28px;
+    z-index: 10;
+    display: none;
+  }
+  #loaderWrap.visible { display: block; }
+
+  #loaderMeta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 7px;
+  }
+
+  #loadingLabel {
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: rgba(180,240,255,0.65);
+    text-shadow: 0 0 10px rgba(0,238,255,0.5);
+  }
+
+  #pctLabel {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 12px rgba(0,220,255,0.9);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* Track */
+  #barTrack {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Fill */
+  #barFill {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #00c8ff 0%, #00eeff 50%, #ffffff 100%);
+    box-shadow: 0 0 10px rgba(0,220,255,0.8), 0 0 20px rgba(0,220,255,0.4);
+    position: relative;
+    transition: none;
+  }
+
+  /* Shimmer on fill */
+  #barFill::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -60px;
+    width: 60px; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0%   { left: -60px; }
+    100% { left: 110%; }
+  }
+
+  /* Tip glow dot */
+  #barTip {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px 4px rgba(0,220,255,0.9), 0 0 16px 8px rgba(0,220,255,0.4);
+    animation: tipPulse 1s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes tipPulse {
+    0%, 100% { box-shadow: 0 0 8px 4px rgba(0,220,255,0.9), 0 0 16px 8px rgba(0,220,255,0.3); }
+    50%       { box-shadow: 0 0 12px 6px rgba(0,220,255,1),   0 0 24px 12px rgba(0,220,255,0.5); }
+  }
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+
+<!-- Rotate prompt -->
+<div id="rotatePrompt">
+  <div class="phone-wrap">
+    <svg class="phone-svg" viewBox="0 0 56 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="52" height="86" rx="9" stroke="#00eeff" stroke-width="3"/>
+      <circle cx="28" cy="77" r="5" fill="#00eeff" opacity="0.7"/>
+      <rect x="20" y="8" width="16" height="3" rx="1.5" fill="#00eeff" opacity="0.4"/>
+    </svg>
+  </div>
+  <p>Rotate to landscape</p>
+</div>
+
+<!-- Loader bar -->
+<div id="loaderWrap">
+  <div id="loaderMeta">
+    <span id="loadingLabel">L O A D I N G</span>
+    <span id="pctLabel">0%</span>
+  </div>
+  <div id="barTrack">
+    <div id="barFill">
+      <div id="barTip"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const rotatePrompt = document.getElementById('rotatePrompt');
+  const loaderWrap   = document.getElementById('loaderWrap');
+  const barFill      = document.getElementById('barFill');
+  const barTip       = document.getElementById('barTip');
+  const pctLabel     = document.getElementById('pctLabel');
+
+  let progress = 0;
+  let started = false;
+  let rafId = null;
+
+  function isLandscape() {
+    if (screen.orientation) return screen.orientation.type.startsWith('landscape');
+    return window.innerWidth > window.innerHeight;
+  }
+
+  function startLoader() {
+    progress = 0;
+    barFill.style.width = '0%';
+    pctLabel.textContent = '0%';
+    loaderWrap.classList.add('visible');
+
+    function tick() {
+      const speed = progress < 70 ? 0.5 : progress < 92 ? 0.2 : 0.06;
+      progress = Math.min(100, progress + speed);
+
+      const pct = progress.toFixed(1);
+      barFill.style.width = pct + '%';
+      barTip.style.left = pct + '%';
+      pctLabel.textContent = Math.round(progress) + '%';
+
+      if (progress < 100) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        barTip.style.display = 'none';
+        pctLabel.textContent = '100%';
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function onOrientationChange() {
+    setTimeout(() => {
+      if (isLandscape()) {
+        rotatePrompt.classList.add('hidden');
+        if (!started) {
+          started = true;
+          startLoader();
+        }
+      } else {
+        rotatePrompt.classList.remove('hidden');
+      }
+    }, 250);
+  }
+
+  if (screen.orientation) {
+    screen.orientation.addEventListener('change', onOrientationChange);
+  }
+  window.addEventListener('orientationchange', onOrientationChange);
+  window.addEventListener('resize', onOrientationChange);
+
+  // Check on page load
+  onOrientationChange();
+</script>
+</body>
+</html>
+
