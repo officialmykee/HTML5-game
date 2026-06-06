@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full Screen Loader</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+<canvas id="loaderCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('loaderCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, dpr;
+
+function resizeCanvas() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  
+  // Scale canvas size for sharp High-DPI screens
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  
+  // Scale drawing context back to match logical coordinates
+  ctx.scale(dpr, dpr);
+}
+resizeCanvas();
+
+// --- State ---
+let progress = 0;
+let loadDone = false;
+let shimmerOffset = 0;
+let particleList = [];
+let frame = 0;
+let glowPulse = 0;
+let img = new Image();
+img.crossOrigin = 'anonymous';
+
+img.src = 'https://i.ibb.co/wh4h5Fthh/66903a61-5193-42a3-98d4-0f93227f75ea.png';
+
+let imgLoaded = false;
+img.onload = () => { imgLoaded = true; };
+img.onerror = () => {
+  img2 = new Image();
+  img2.src = 'https://i.ibb.co/wh4h5Fth/image.jpg';
+  img2.onload = () => { img = img2; imgLoaded = true; };
+};
+
+// --- Particles ---
+function spawnParticle() {
+  // Lock particles to the bottom region near the UI bar
+  const barX = W * 0.1;
+  const barW = W * 0.8;
+  const barY = H - 60;
+  const barH = 10;
+  const px = barX + Math.random() * (barW * (progress / 100));
+  return {
+    x: px,
+    y: barY + barH / 2,
+    vx: (Math.random() - 0.5) * 2,
+    vy: -(Math.random() * 3 + 1),
+    alpha: 1,
+    size: Math.random() * 3 + 1,
+    color: `hsl(${Math.random() * 60 + 180}, 100%, 70%)`
+  };
+}
+
+for (let i = 0; i < 40; i++) {
+  particleList.push(spawnParticle());
+}
+
+function updateParticles() {
+  for (let p of particleList) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -= 0.018;
+    p.vy += 0.05;
+    if (p.alpha <= 0) {
+      Object.assign(p, spawnParticle());
+      p.alpha = Math.random() * 0.7 + 0.3;
+    }
+  }
+}
+
+// Helper to center-crop image perfectly on any resolution (CSS background-size: cover logic)
+function drawCoverImage(ctx, img, w, h) {
+  const imgRatio = img.width / img.height;
+  const canvasRatio = w / h;
+  let sx, sy, sw, sh;
+
+  if (canvasRatio > imgRatio) {
+    sw = img.width;
+    sh = img.width / canvasRatio;
+    sx = 0;
+    sy = (img.height - sh) / 2;
+  } else {
+    sh = img.height;
+    sw = img.height * canvasRatio;
+    sx = (img.width - sw) / 2;
+    sy = 0;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+}
+
+// --- Draw ---
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // === Background Image ===
+  if (imgLoaded) {
+    ctx.save();
+    drawCoverImage(ctx, img, W, H);
+    
+    // Smooth gradient blend overlay at the bottom for readability
+    const grad = ctx.createLinearGradient(0, H * 0.5, 0, H);
+    grad.addColorStop(0, 'rgba(10,10,15,0)');
+    grad.addColorStop(0.6, 'rgba(10,10,15,0.7)');
+    grad.addColorStop(1, 'rgba(10,10,15,0.95)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#0d1b2a');
+    bg.addColorStop(1, '#1a0a2e');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // === UI Bar Layout Configuration ===
+  const barX = W * 0.1;
+  const barW = W * 0.8;
+  const barY = H - 60; // Anchored to bottom screen area safely
+  const barH = 10;
+  const radius = barH / 2;
+
+  // --- Bar Track ---
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, barX, barY, barW, barH, radius);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+
+  // --- Bar Fill ---
+  const fillW = barW * (progress / 100);
+  if (fillW > 0) {
+    ctx.save();
+    ctx.beginPath();
+    roundRect(ctx, barX, barY, fillW, barH, radius);
+    ctx.clip();
+
+    const fillGrad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+    fillGrad.addColorStop(0, '#00c8ff');
+    fillGrad.addColorStop(0.4, '#00eeff');
+    fillGrad.addColorStop(0.75, '#7df9ff');
+    fillGrad.addColorStop(1, '#ffffff');
+    ctx.fillStyle = fillGrad;
+    ctx.fillRect(barX, barY, fillW, barH);
+
+    const shimX = barX + (shimmerOffset % (fillW + 120)) - 60;
+    const shimGrad = ctx.createLinearGradient(shimX - 40, 0, shimX + 40, 0);
+    shimGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    shimGrad.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+    shimGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shimGrad;
+    ctx.fillRect(barX, barY, fillW, barH);
+
+    ctx.restore();
+
+    // Glow effect
+    ctx.save();
+    const glow = ctx.createRadialGradient(barX + fillW, barY + barH / 2, 0, barX + fillW, barY + barH / 2, 22);
+    const pulse = 0.5 + 0.5 * Math.sin(glowPulse);
+    glow.addColorStop(0, `rgba(0,220,255,${0.7 * pulse})`);
+    glow.addColorStop(1, 'rgba(0,220,255,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(barX + fillW - 22, barY - 10, 44, barH + 20);
+    ctx.restore();
+  }
+
+  // --- Particles ---
+  ctx.save();
+  for (let p of particleList) {
+    ctx.globalAlpha = Math.max(0, p.alpha);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 6;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // --- Dynamic Text Scaling System ---
+  const dynamicFontSize = Math.max(14, Math.round(W * 0.015));
+
+  // --- Percentage Text ---
+  ctx.save();
+  const textY = barY - 14;
+  ctx.font = `bold ${dynamicFontSize}px 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.shadowColor = 'rgba(0,200,255,0.8)';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(Math.round(progress) + '%', barX + barW, textY);
+  ctx.restore();
+
+  // --- "LOADING" Label ---
+  ctx.save();
+  ctx.font = `${dynamicFontSize - 2}px 'Segoe UI', sans-serif`;
+  ctx.letterSpacing = '4px';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(180,240,255,0.7)';
+  ctx.shadowColor = '#00eeff';
+  ctx.shadowBlur = 8;
+  ctx.fillText('L O A D I N G', barX + 2, textY);
+  ctx.restore();
+
+  // --- Done flash ---
+  if (loadDone) {
+    ctx.save();
+    const readyFontSize = Math.max(32, Math.round(W * 0.04));
+    ctx.font = `bold ${readyFontSize}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * Math.sin(frame * 0.12)})`;
+    ctx.shadowColor = '#00eeff';
+    ctx.shadowBlur = 30;
+    ctx.fillText('READY!', W / 2, H / 2);
+    ctx.restore();
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// --- Animation Loop ---
+function loop() {
+  frame++;
+  glowPulse += 0.07;
+  shimmerOffset += 2.5;
+
+  if (!loadDone) {
+    const speed = progress < 70 ? 0.55 : progress < 92 ? 0.22 : 0.08;
+    progress = Math.min(100, progress + speed);
+    if (progress >= 100) {
+      progress = 100;
+      loadDone = true;
+    }
+    updateParticles();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// Handle browser window resize cleanly
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  // recalculate existing particle metrics relative to new width
+  particleList = [];
+  for (let i = 0; i < 40; i++) particleList.push(spawnParticle());
+});
+
+loop();
+
+// Restart click interaction handler
+canvas.addEventListener('click', () => {
+  if (loadDone) {
+    progress = 0;
+    loadDone = false;
+    shimmerOffset = 0;
+    particleList = [];
+    for (let i = 0; i < 40; i++) particleList.push(spawnParticle());
+  }
+});
+</script>
+</body>
+</html>
+
