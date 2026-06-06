@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loader</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    max-width: 100vw;
+  }
+</style>
+</head>
+<body>
+<canvas id="loaderCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('loaderCanvas');
+const ctx = canvas.getContext('2d');
+
+const W = Math.min(window.innerWidth, 900);
+const H = Math.round(W * (320 / 900));
+canvas.width = W;
+canvas.height = H;
+
+// --- State ---
+let progress = 0;
+let loadDone = false;
+let shimmerOffset = 0;
+let particleList = [];
+let frame = 0;
+let glowPulse = 0;
+let img = new Image();
+img.crossOrigin = 'anonymous';
+
+// Try direct upload first, fallback to ibb link
+img.src = 'https://i.ibb.co/wh4h5Fthh/66903a61-5193-42a3-98d4-0f93227f75ea.png';
+
+let imgLoaded = false;
+img.onload = () => { imgLoaded = true; };
+img.onerror = () => {
+  // fallback: try without crossOrigin
+  img2 = new Image();
+  img2.src = 'https://i.ibb.co/wh4h5Fth/image.jpg';
+  img2.onload = () => { img = img2; imgLoaded = true; };
+};
+
+// --- Particles ---
+function spawnParticle() {
+  const barX = W * 0.05;
+  const barW = W * 0.9;
+  const barY = H - 38;
+  const barH = 10;
+  const px = barX + Math.random() * (barW * (progress / 100));
+  return {
+    x: px,
+    y: barY + barH / 2,
+    vx: (Math.random() - 0.5) * 2,
+    vy: -(Math.random() * 3 + 1),
+    alpha: 1,
+    size: Math.random() * 3 + 1,
+    color: `hsl(${Math.random() * 60 + 180}, 100%, 70%)`
+  };
+}
+
+for (let i = 0; i < 30; i++) {
+  particleList.push(spawnParticle());
+}
+
+function updateParticles() {
+  for (let p of particleList) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.alpha -= 0.018;
+    p.vy += 0.05;
+    if (p.alpha <= 0) {
+      Object.assign(p, spawnParticle());
+      p.alpha = Math.random() * 0.7 + 0.3;
+    }
+  }
+}
+
+// --- Draw ---
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // === Background Image ===
+  if (imgLoaded) {
+    ctx.save();
+    ctx.drawImage(img, 0, 0, W, H);
+    // Dark gradient overlay at bottom for loader visibility
+    const grad = ctx.createLinearGradient(0, H * 0.45, 0, H);
+    grad.addColorStop(0, 'rgba(5,5,15,0)');
+    grad.addColorStop(0.55, 'rgba(5,5,15,0.72)');
+    grad.addColorStop(1, 'rgba(5,5,15,0.95)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  } else {
+    // Placeholder background
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#0d1b2a');
+    bg.addColorStop(1, '#1a0a2e');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // === Bar Setup ===
+  const barX = W * 0.05;
+  const barW = W * 0.9;
+  const barY = H - 42;
+  const barH = 10;
+  const radius = barH / 2;
+
+  // --- Bar Track ---
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, barX, barY, barW, barH, radius);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+
+  // --- Bar Fill ---
+  const fillW = barW * (progress / 100);
+  if (fillW > 0) {
+    ctx.save();
+    ctx.beginPath();
+    roundRect(ctx, barX, barY, fillW, barH, radius);
+    ctx.clip();
+
+    // Main gradient fill
+    const fillGrad = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+    fillGrad.addColorStop(0, '#00c8ff');
+    fillGrad.addColorStop(0.4, '#00eeff');
+    fillGrad.addColorStop(0.75, '#7df9ff');
+    fillGrad.addColorStop(1, '#ffffff');
+    ctx.fillStyle = fillGrad;
+    ctx.fillRect(barX, barY, fillW, barH);
+
+    // Shimmer sweep
+    const shimX = barX + (shimmerOffset % (fillW + 120)) - 60;
+    const shimGrad = ctx.createLinearGradient(shimX - 40, 0, shimX + 40, 0);
+    shimGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    shimGrad.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+    shimGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shimGrad;
+    ctx.fillRect(barX, barY, fillW, barH);
+
+    ctx.restore();
+
+    // Glow on bar tip
+    ctx.save();
+    const glow = ctx.createRadialGradient(barX + fillW, barY + barH / 2, 0, barX + fillW, barY + barH / 2, 22);
+    const pulse = 0.5 + 0.5 * Math.sin(glowPulse);
+    glow.addColorStop(0, `rgba(0,220,255,${0.7 * pulse})`);
+    glow.addColorStop(1, 'rgba(0,220,255,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(barX + fillW - 22, barY - 10, 44, barH + 20);
+    ctx.restore();
+  }
+
+  // --- Particles ---
+  ctx.save();
+  for (let p of particleList) {
+    ctx.globalAlpha = Math.max(0, p.alpha);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 6;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // --- Percentage Text ---
+  ctx.save();
+  const pctX = barX + fillW;
+  const textY = barY - 10;
+  ctx.font = `bold ${Math.round(W * 0.022)}px 'Segoe UI', sans-serif`;
+  ctx.textAlign = 'center';
+  // Shadow for readability
+  ctx.shadowColor = 'rgba(0,200,255,0.8)';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(Math.round(progress) + '%', Math.min(barX + fillW, barX + barW - 16), textY);
+  ctx.restore();
+
+  // --- "LOADING" Label ---
+  ctx.save();
+  ctx.font = `${Math.round(W * 0.016)}px 'Segoe UI', sans-serif`;
+  ctx.letterSpacing = '4px';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(180,240,255,0.7)';
+  ctx.shadowColor = '#00eeff';
+  ctx.shadowBlur = 8;
+  ctx.fillText('L O A D I N G', barX + 2, barY - 10);
+  ctx.restore();
+
+  // --- Done flash ---
+  if (loadDone) {
+    ctx.save();
+    ctx.font = `bold ${Math.round(W * 0.045)}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * Math.sin(frame * 0.12)})`;
+    ctx.shadowColor = '#00eeff';
+    ctx.shadowBlur = 30;
+    ctx.fillText('READY!', W / 2, H / 2 + 10);
+    ctx.restore();
+  }
+}
+
+// Polyfill roundRect for older browsers
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// --- Animation Loop ---
+function loop() {
+  frame++;
+  glowPulse += 0.07;
+  shimmerOffset += 2.5;
+
+  if (!loadDone) {
+    // Simulate loading: fast at first, slows near 100
+    const speed = progress < 70 ? 0.55 : progress < 92 ? 0.22 : 0.08;
+    progress = Math.min(100, progress + speed);
+    if (progress >= 100) {
+      progress = 100;
+      loadDone = true;
+    }
+    updateParticles();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+
+// Restart on click after done
+canvas.addEventListener('click', () => {
+  if (loadDone) {
+    progress = 0;
+    loadDone = false;
+    shimmerOffset = 0;
+    particleList = [];
+    for (let i = 0; i < 30; i++) particleList.push(spawnParticle());
+  }
+});
+</script>
+</body>
+</html>
+
