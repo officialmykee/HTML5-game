@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Level Selection</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Exo+2:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Portrait lock overlay */
+  .rotate-prompt {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: #07091a;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px;
+    font-family: 'Exo 2', sans-serif;
+    color: #4d9fff;
+    text-align: center;
+    padding: 40px;
+  }
+  .rotate-icon {
+    font-size: 64px;
+    animation: rotateHint 2s ease-in-out infinite;
+    display: block;
+  }
+  @keyframes rotateHint {
+    0%,100% { transform: rotate(0deg); }
+    40%     { transform: rotate(-90deg); }
+    60%     { transform: rotate(-90deg); }
+  }
+  .rotate-prompt p {
+    font-size: 16px; letter-spacing: 2px; text-transform: uppercase;
+    opacity: 0.8; line-height: 1.6;
+  }
+  .rotate-prompt span {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 13px; color: #f5c842;
+    letter-spacing: 3px;
+  }
+
+  @media (orientation: portrait) {
+    .rotate-prompt { display: flex; }
+    body > *:not(.rotate-prompt) { display: none !important; }
+  }
+
+  :root {
+    --deep: #07091a;
+    --ocean: #0d1e4a;
+    --sapphire: #1a3a8f;
+    --crystal: #2560cc;
+    --glow: #4d9fff;
+    --gold: #f5c842;
+    --gold-dark: #c49b15;
+    --gold-glow: #ffe066;
+    --silver: #a8c4e8;
+    --locked: #1a2a50;
+    --locked-text: #3a5080;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, #0e1f55 0%, #07091a 70%);
+    font-family: 'Exo 2', sans-serif;
+    overflow: hidden;
+  }
+
+  /* Animated star field */
+  .starfield {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: white;
+    animation: twinkle var(--d, 3s) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: var(--a1, 0.1); transform: scale(1); }
+    to   { opacity: var(--a2, 0.7); transform: scale(1.4); }
+  }
+
+  /* Container wrapper */
+  .panel-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+    padding: 10px;
+    z-index: 1;
+  }
+
+  /* Base Desktop Panel Layout */
+  .panel {
+    position: relative;
+    background: linear-gradient(160deg, #0f1f55 0%, #080d2a 100%);
+    border: 2px solid var(--crystal);
+    border-radius: 24px;
+    padding: 36px 40px 32px;
+    width: 520px;
+    box-shadow:
+      0 0 0 1px rgba(77,159,255,0.15),
+      0 0 40px rgba(37,96,204,0.4),
+      0 0 80px rgba(13,30,74,0.8),
+      inset 0 1px 0 rgba(255,255,255,0.07);
+    animation: panelIn 0.6s cubic-bezier(0.22,1,0.36,1) both;
+    display: flex;
+    flex-direction: column;
+  }
+  @keyframes panelIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Corner ornaments */
+  .panel::before, .panel::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    border-color: var(--gold);
+    border-style: solid;
+  }
+  .panel::before { top: 10px; left: 10px; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
+  .panel::after  { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .coins {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .coin {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--gold-glow), var(--gold) 50%, var(--gold-dark));
+    border: 2px solid rgba(255,255,255,0.3);
+    box-shadow: 0 0 14px rgba(245,200,66,0.7), inset 0 -2px 4px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 900; color: #7a5100;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+    animation: coinSpin 6s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes coinSpin {
+    0%,100% { transform: rotateY(0deg); }
+    45%     { transform: rotateY(0deg); }
+    50%     { transform: rotateY(90deg) scaleX(0.2); }
+    55%     { transform: rotateY(180deg); }
+  }
+  .coin-count { color: var(--gold); font-size: 20px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 0 10px rgba(245,200,66,0.5); }
+
+  h1 {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 20px;
+    color: transparent;
+    background: linear-gradient(180deg, #ffffff 0%, var(--glow) 60%, var(--gold) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    letter-spacing: 3px;
+    text-align: center;
+    flex: 1;
+    filter: drop-shadow(0 0 8px rgba(77,159,255,0.6));
+  }
+
+  /* Grid Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  /* Level tile */
+  .tile {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 14px;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    user-select: none;
+  }
+  
+  .tile.unlocked {
+    background: linear-gradient(145deg, #1e3f9e 0%, #0f2268 100%);
+    border: 1.5px solid var(--crystal);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+  .tile.unlocked:hover {
+    transform: translateY(-4px) scale(1.06);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.18), 0 0 20px rgba(77,159,255,0.5);
+  }
+  .tile.unlocked:active { transform: scale(0.97); }
+
+  .tile.active {
+    background: linear-gradient(145deg, #2c6be0 0%, #1040a8 100%);
+    border: 2px solid var(--glow);
+    box-shadow: 0 0 0 3px rgba(77,159,255,0.25), 0 0 24px rgba(77,159,255,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .tile.active:hover { transform: translateY(-4px) scale(1.08); }
+
+  .tile.locked {
+    background: linear-gradient(145deg, #101d40 0%, #080e22 100%);
+    border: 1.5px solid #1e2e60;
+    cursor: default;
+    opacity: 0.75;
+  }
+
+  .level-num {
+    font-size: 22px; font-weight: 800;
+    color: white;
+    text-shadow: 0 0 10px rgba(77,159,255,0.8);
+    line-height: 1;
+  }
+  .tile.active .level-num { text-shadow: 0 0 16px rgba(255,255,255,0.9); font-size: 24px; }
+  .tile.locked .level-num { display: none; }
+
+  /* Stars row */
+  .stars {
+    display: flex; gap: 3px; height: 10px; align-items: center;
+  }
+  .star-icon {
+    width: 10px; height: 10px;
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  }
+  .star-icon.filled { background: var(--gold); filter: drop-shadow(0 0 3px var(--gold)); }
+  .star-icon.empty  { background: #2a3e70; }
+
+  .lock-icon {
+    color: var(--locked-text); font-size: 22px;
+  }
+
+  .tile.unlocked::after, .tile.active::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%);
+    border-radius: inherit; pointer-events: none; transition: left 0.4s ease;
+  }
+  .tile.unlocked:hover::after, .tile.active:hover::after { left: 150%; }
+
+  .divider {
+    width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--crystal), transparent);
+    margin-bottom: 20px; opacity: 0.4;
+  }
+
+  /* Buttons */
+  .buttons { display: flex; gap: 14px; }
+  .btn {
+    flex: 1; padding: 13px 0; border: none; border-radius: 12px;
+    font-family: 'Cinzel Decorative', cursive; font-size: 13px; letter-spacing: 2px;
+    cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;
+    position: relative; overflow: hidden;
+  }
+  .btn::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.12); opacity: 0; }
+  .btn:hover::before { opacity: 1; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-back {
+    background: linear-gradient(145deg, #1a3070 0%, #0d1c48 100%);
+    border: 1.5px solid var(--sapphire); color: var(--silver);
+  }
+  .btn-start {
+    background: linear-gradient(145deg, #2560cc 0%, #1040a8 100%);
+    border: 1.5px solid var(--glow); color: white;
+    animation: pulseBtn 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulseBtn {
+    0%,100% { box-shadow: 0 4px 20px rgba(37,96,204,0.5), inset 0 1px 0 rgba(255,255,255,0.15); }
+    50%     { box-shadow: 0 4px 20px rgba(37,96,204,0.6), inset 0 1px 0 rgba(255,255,255,0.15); }
+  }
+
+  /* ========================================================
+     EXTREME MOBILE LANDSCAPE REDUCTION ENGINE
+     ======================================================== */
+  @media (max-height: 540px) and (orientation: landscape) {
+    .panel-container {
+      padding: 0;
+    }
+    
+    /* Shrink the box bounds intentionally so margins are left on all sides */
+    .panel {
+      width: 85vw;
+      height: 85vh;
+      max-width: 580px;
+      max-height: 290px;
+      flex-direction: row;
+      padding: 12px 16px;
+      gap: 16px;
+      border-radius: 12px;
+      align-items: center;
+    }
+
+    /* Left panel contents */
+    .left-side {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 38%;
+      height: 100%;
+    }
+
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      margin-bottom: 0;
+    }
+
+    h1 {
+      font-size: 15px;
+      text-align: left;
+      letter-spacing: 1px;
+    }
+
+    .coin {
+      width: 22px; height: 22px; font-size: 10px;
+    }
+    .coin-count {
+      font-size: 14px;
+    }
+
+    .header-spacer, .divider { display: none !important; }
+
+    /* Buttons stack neatly on the bottom left */
+    .buttons {
+      width: 100%;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: auto;
+    }
+
+    .btn {
+      padding: 7px 0;
+      font-size: 10px;
+      border-radius: 6px;
+      letter-spacing: 1px;
+    }
+
+    /* Right side Grid layout takes remaining room */
+    .grid {
+      width: 62%;
+      height: 100%;
+      margin-bottom: 0;
+      gap: 6px;
+      align-content: center;
+    }
+
+    .tile {
+      border-radius: 8px;
+    }
+
+    .level-num, .lock-icon {
+      font-size: 13px;
+    }
+    .tile.active .level-num {
+      font-size: 15px;
+    }
+    
+    .stars {
+      height: 6px;
+      gap: 2px;
+    }
+    .star-icon {
+      width: 6px; height: 6px;
+    }
+  }
+
+  /* Extreme safety squeeze for very low screen dimensions */
+  @media (max-height: 360px) and (orientation: landscape) {
+    .panel {
+      transform: scale(0.92);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="rotate-prompt">
+  <span class="rotate-icon">📱</span>
+  <span>Rotate Your Device</span>
+  <p>This game requires<br>landscape orientation</p>
+</div>
+
+<div class="starfield" id="sf"></div>
+
+<div class="panel-container">
+  <div class="panel">
+    
+    <div class="left-side">
+      <div class="header">
+        <div class="coins">
+          <div class="coin">✦</div>
+          <span class="coin-count">247</span>
+        </div>
+        <h1>Level Select</h1>
+        <div style="width:72px" class="header-spacer"></div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-back" onclick="handleBack()">◂ Back</button>
+        <button class="btn btn-start" onclick="handleStart()">Play ▸</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="grid" id="grid"></div>
+
+  </div>
+</div>
+
+<script>
+const levels = [
+  { stars: 2 }, { stars: 0 }, { stars: -1 }, { stars: -1 },
+  { stars: -1 }, { stars: -1 }, { stars: -1 }, { stars: -1 },
+  { stars: -1 }, { stars: -1 }, { stars: -1 }, { stars: -1 },
+];
+
+let selected = 0; 
+
+function render() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  levels.forEach((lvl, i) => {
+    const tile = document.createElement('div');
+    const isLocked = lvl.stars === -1;
+    const isActive = i === selected;
+    tile.className = `tile ${isLocked ? 'locked' : isActive ? 'active' : 'unlocked'}`;
+
+    if (isLocked) {
+      tile.innerHTML = `<span class="lock-icon">🔒</span>`;
+    } else {
+      const filled = lvl.stars;
+      const starsHtml = filled > 0 ? `<div class="stars">${[0,1,2].map(s =>
+        `<div class="star-icon ${s < filled ? 'filled' : 'empty'}"></div>`
+      ).join('')}</div>` : '';
+      tile.innerHTML = `
+        <span class="level-num">${i + 1}</span>
+        ${starsHtml}
+      `;
+      tile.addEventListener('click', () => { selected = i; render(); });
+    }
+    grid.appendChild(tile);
+  });
+}
+
+function handleBack() {
+  const panel = document.querySelector('.panel');
+  panel.style.transition = 'opacity 0.3s, transform 0.3s';
+  panel.style.opacity = '0';
+  setTimeout(() => { panel.style.opacity = '1'; panel.style.transition = ''; }, 400);
+}
+
+function handleStart() {
+  if (selected === -1) return;
+  const btn = document.querySelector('.btn-start');
+  btn.textContent = 'Loading…';
+  btn.style.filter = 'brightness(1.4)';
+  setTimeout(() => { btn.textContent = 'Play ▸'; btn.style.filter = ''; }, 1200);
+}
+
+const sf = document.getElementById('sf');
+for (let i = 0; i < 90; i++) {
+  const s = document.createElement('div');
+  const size = Math.random() * 2.5 + 0.5;
+  s.className = 'star';
+  Object.assign(s.style, {
+    width: size + 'px', height: size + 'px',
+    left: Math.random() * 100 + '%',
+    top: Math.random() * 100 + '%',
+    '--d': (Math.random() * 3 + 2) + 's',
+    '--a1': Math.random() * 0.2,
+    '--a2': Math.random() * 0.7 + 0.2,
+    animationDelay: (Math.random() * 4) + 's',
+  });
+  sf.appendChild(s);
+}
+
+render();
+</script>
+</body>
+</html>
+
